@@ -80,40 +80,96 @@ ollama pull qwen3.5:2b
 
 ## Cara Pakai
 
+Manga Translator menggunakan sistem **subcommand** (`translate`, `split`, `merge`, `status`) untuk mendukung skenario pemrosesan komik kecil hingga sangat besar (dipecah per bagian).
+
+### 1. Terjemahkan Langsung (Komik Ringan)
+
 ```bash
 # Terjemahkan manga Jepang
-python main.py -i "komik.pdf" -o "komik_id.pdf"
+python main.py translate -i "komik.pdf" -o "komik_id.pdf"
 
 # Terjemahkan manhua China
-python main.py -i "manhua.pdf" -o "manhua_id.pdf" --lang ch
+python main.py translate -i "manhua.pdf" -o "manhua_id.pdf" --lang ch
 
 # Terjemahkan manhwa Korea
-python main.py -i "manhwa.pdf" -o "manhwa_id.pdf" --lang korean
+python main.py translate -i "manhwa.pdf" -o "manhwa_id.pdf" --lang korean
 
 # Jalankan satu tahap saja (untuk resume jika terputus)
-python main.py -i "komik.pdf" -o "hasil.pdf" --stage 1  # deteksi + OCR
-python main.py -i "komik.pdf" -o "hasil.pdf" --stage 2  # terjemahan
-python main.py -i "komik.pdf" -o "hasil.pdf" --stage 3  # render PDF
+python main.py translate -i "komik.pdf" -o "hasil.pdf" --stage 1  # deteksi + OCR
+python main.py translate -i "komik.pdf" -o "hasil.pdf" --stage 2  # terjemahan
+python main.py translate -i "komik.pdf" -o "hasil.pdf" --stage 3  # render PDF
+```
+
+### 2. Workflow Part per Part (Komik Besar)
+
+Jika komik sangat panjang, memori akan cepat penuh. Maka manfaatkan pecah per-part:
+
+```bash
+# a. Pecah komik besar menjadi part-part kecil (misal: per 50 halaman)
+python main.py split -i "komik.pdf" --pages 50
+
+# b. Terjemahkan dari salah satu file part
+# (simpan sementara ke null/bebas asal nama output tersedia, krn merge membaca part yg sudah ditranslate)
+python main.py translate -i "komik_parts/komik_part001.pdf" -o /dev/null
+
+# c. Cek progres semua part pengerjaan komik
+python main.py status -i "komik.pdf"
+
+# d. Gabungkan semua PDF part yang sudah sukses
+python main.py merge -i "komik.pdf" -o "komik_id.pdf"
 ```
 
 ---
 
 ## Opsi CLI Lengkap
 
-| Argumen            | Default                                  | Keterangan                                    |
-| ------------------ | ---------------------------------------- | --------------------------------------------- |
-| `--input / -i`     | —                                        | Path PDF input (wajib)                        |
-| `--output / -o`    | —                                        | Path PDF output (wajib)                       |
-| `--lang / -l`      | `ja`                                     | Bahasa sumber: `ja` / `ch` / `korean`         |
-| `--stage / -s`     | semua                                    | Jalankan hanya tahap 1 / 2 / 3                |
-| `--model / -m`     | `qwen3.5:2b`                             | Model Ollama                                  |
-| `--font-size / -f` | `20`                                     | Ukuran font terjemahan                        |
-| `--yolo`           | `comic-speech-bubble-detector-yolov8.pt` | Path YOLO model                               |
-| `--font`           | `arial-unicode-ms.ttf`                   | Path font TTF                                 |
-| `--dpi`            | `150`                                    | DPI render halaman                            |
-| `--conf`           | `0.35`                                   | Confidence threshold YOLO                     |
-| `--shutdown`       | `False`                                  | Shutdown PC otomatis setelah proses selesai   |
-| `--shutdown-delay` | `1`                                      | Jeda waktu (dalam menit) sebelum PC dimatikan |
+Sistem ini memiliki 4 subcommand utama. Anda dapat memanggil bantuan detail fitur via `python main.py --help`.
+
+| Subcommand  | Fungsi                                                                           |
+| ----------- | -------------------------------------------------------------------------------- |
+| `translate` | Menerjemahkan sebuah dokumen atau part PDF melalui 3 tahap (OCR, Ollama, Render) |
+| `split`     | Memecah dokumen PDF besar menjadi potongan (part) kecil untuk diterjemahkan      |
+| `status`    | Mengecek status keseluruhan part PDF, yang sudah selesai maupun yang belum       |
+| `merge`     | Menyatukan semua part hasil terjemahan menjadi dokumen konsekutif                |
+
+### Opsi Umum (Muncul di Beberapa Subcommand)
+
+| Argumen            | Default                | Keterangan                                               |
+| ------------------ | ---------------------- | -------------------------------------------------------- |
+| `--lang / -l`      | `ja`                   | Bahasa sumber teks asli: `ja` / `ch` / `korean`          |
+| `--model / -m`     | `qwen3.5:2b`           | Nama model terjemahan Ollama yang dijalankan lokal       |
+| `--font-size / -f` | `20`                   | Ukuran font yang dipakai selama render text balon kata   |
+| `--font`           | `arial-unicode-ms.ttf` | Path lokasi custom font `TTF` sistem                     |
+| `--dpi`            | `150`                  | Nilai DPI ketajaman PDF ke Raster Image yang diproses    |
+| `--yolo`           | `comic-speech-...`     | Path file detektor text bubble YOLO `.pt`                |
+| `--conf`           | `0.35`                 | Confidence score YOLO dalam mendeteksi kotak balon komik |
+
+### Opsi Khusus Subcommand
+
+**`translate`**
+
+- `--input / -i` : Path PDF original yang diproses (wajib)
+- `--output / -o` : Path output yang di-generate (wajib)
+- `--stage / -s` : Jalankan salah satu stage (`1`, `2`, `3`). Tanpa parameter berarti semua tahap tereksekusi.
+- `--shutdown` : Mematikan PC seketika proses selesai
+- `--shutdown-delay` : Mengatur delay (dalam hitungan menit) sebelum PC shutdown (default: 1)
+
+**`split`**
+
+- `--input / -i` : Path PDF untuk dipotong (wajib)
+- `--pages / -p` : Panjang batas jumlah halaman per part (default: 50)
+- `--shutdown`, `--shutdown-delay` : Dapat dipakai untuk otomasi
+
+**`merge`**
+
+- `--input / -i` : Path nama file referensi utama/asal komik awal (wajib)
+- `--output / -o` : Path target untuk dijadikan file jadi (wajib)
+- `--force` : Tetap nekat menyatukan dokumen meskipun beberapa halaman/part belum tuntas terjemahan
+- `--shutdown`, `--shutdown-delay`
+
+**`status`**
+
+- `--input / -i` : Path file sumber asli PDF (wajib)
 
 ---
 
