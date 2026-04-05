@@ -91,6 +91,10 @@ def add_common_args(parser: argparse.ArgumentParser):
                       help=f"DPI render halaman (default: {Config.render_dpi})")
   parser.add_argument("--conf", type=float, default=Config.yolo_conf,
                       help=f"Confidence threshold YOLO (default: {Config.yolo_conf})")
+  parser.add_argument("--target", "-t", default="English",
+                      help="Bahasa tujuan terjemahan (default: English)")
+  parser.add_argument("--force-paddle", action="store_true",
+                      help="Paksa gunakan PaddleOCR (meskipun untuk bahasa Jepang)")
 
 
 def make_config(args) -> Config:
@@ -298,6 +302,8 @@ OPSI UMUM (COMMON OPTIONS)
        --dpi <int>           DPI resolusi saat me-render halaman.
        --yolo <path>         Path file model YOLO (.pt) untuk deteksi bubble.
        --conf <float>        Confidence threshold YOLO untuk deteksi teks.
+       -t, --target <lang>   Bahasa tujuan terjemahan (contoh: Indonesia, English). Default: Indonesia.
+       --force-paddle        Paksa menggunakan PaddleOCR meski bahasa sumbernya Jepang.
 
 OPSI SHUTDOWN (Tidak tersedia di subcommand status)
        --shutdown            Shutdown PC otomatis setelah proses selesai.

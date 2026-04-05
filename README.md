@@ -73,7 +73,7 @@ pip install paddlepaddle paddleocr
 
 # 6. Pastikan Ollama berjalan
 sudo systemctl start ollama
-ollama pull qwen3.5:2b
+ollama pull qwen3.5:2b-q4_K_M
 ```
 
 ---
@@ -93,6 +93,12 @@ python main.py translate -i "manhua.pdf" -o "manhua_id.pdf" --lang ch
 
 # Terjemahkan manhwa Korea
 python main.py translate -i "manhwa.pdf" -o "manhwa_id.pdf" --lang korean
+
+# Terjemahkan dengan target bahasa Inggris
+python main.py translate -i "komik.pdf" -o "komik_en.pdf" --target English
+
+# Paksa menggunakan PaddleOCR pada manga Jepang
+python main.py translate -i "komik.pdf" -o "komik_id.pdf" --force-paddle
 
 # Jalankan satu tahap saja (untuk resume jika terputus)
 python main.py translate -i "komik.pdf" -o "hasil.pdf" --stage 1  # deteksi + OCR
@@ -134,15 +140,17 @@ Sistem ini memiliki 4 subcommand utama. Anda dapat memanggil bantuan detail fitu
 
 ### Opsi Umum (Muncul di Beberapa Subcommand)
 
-| Argumen            | Default                | Keterangan                                               |
-| ------------------ | ---------------------- | -------------------------------------------------------- |
-| `--lang / -l`      | `ja`                   | Bahasa sumber teks asli: `ja` / `ch` / `korean`          |
-| `--model / -m`     | `qwen3.5:2b`           | Nama model terjemahan Ollama yang dijalankan lokal       |
-| `--font-size / -f` | `20`                   | Ukuran font yang dipakai selama render text balon kata   |
-| `--font`           | `arial-unicode-ms.ttf` | Path lokasi custom font `TTF` sistem                     |
-| `--dpi`            | `150`                  | Nilai DPI ketajaman PDF ke Raster Image yang diproses    |
-| `--yolo`           | `comic-speech-...`     | Path file detektor text bubble YOLO `.pt`                |
-| `--conf`           | `0.35`                 | Confidence score YOLO dalam mendeteksi kotak balon komik |
+| Argumen            | Default                | Keterangan                                                  |
+| ------------------ | ---------------------- | ----------------------------------------------------------- |
+| `--lang / -l`      | `ja`                   | Bahasa sumber teks asli: `ja` / `ch` / `korean`             |
+| `--model / -m`     | `qwen3.5:2b-q4_K_M`    | Nama model terjemahan Ollama yang dijalankan lokal          |
+| `--font-size / -f` | `20`                   | Ukuran font yang dipakai selama render text balon kata      |
+| `--font`           | `arial-unicode-ms.ttf` | Path lokasi custom font `TTF` sistem                        |
+| `--dpi`            | `150`                  | Nilai DPI ketajaman PDF ke Raster Image yang diproses       |
+| `--yolo`           | `comic-speech-...`     | Path file detektor text bubble YOLO `.pt`                   |
+| `--conf`           | `0.35`                 | Confidence score YOLO dalam mendeteksi kotak balon komik    |
+| `--target / -t`    | `English`              | Bahasa tujuan untuk terjemahan                              |
+| `--force-paddle`   | `False`                | Memaksa penggunaan PaddleOCR meskipun bahasa sumbernya `ja` |
 
 ### Opsi Khusus Subcommand
 
