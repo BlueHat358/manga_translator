@@ -1,0 +1,23 @@
+# Manga Translator — Dependencies
+# Install: pip install -r requirements.txt
+
+# Core
+pymupdf          # fitz — baca & tulis PDF
+pillow           # PIL — manipulasi image
+numpy            # array manipulation
+
+# Bubble Detection
+ultralytics      # YOLOv8
+onnxruntime      # ONNX runtime — inferensi CPU lebih cepat dari PyTorch
+
+# OCR
+# MangaOCR (Jepang) — install dari GitHub:
+# pip install git+https://github.com/kha-white/manga-ocr.git
+#
+# PaddleOCR (China/Korea):
+# pip install paddlepaddle paddleocr
+
+# Translation (Ollama API)
+#openai           # OpenAI-compatible client untuk Ollama
+ollama
+
