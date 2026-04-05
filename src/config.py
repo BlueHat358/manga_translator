@@ -7,6 +7,35 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+# Bahasa sumber yang didukung beserta engine OCR-nya
+# Format: "kode_paddleocr": "Nama Tampilan"
+# Referensi lengkap: https://paddlepaddle.github.io/PaddleOCR/ppocr/blog/multi_languages.html
+SUPPORTED_LANGS = {
+    # ── Pakai MangaOCR (lebih akurat untuk font komik stylized) ──
+    "ja": "Japanese",
+
+    # ── Pakai PaddleOCR (80+ bahasa) ──
+    "ch": "Chinese (Simplified)",
+    "chinese_cht": "Chinese (Traditional)",
+    "korean": "Korean",
+    "en": "English",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "es": "Spanish",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "ar": "Arabic",
+    "hi": "Hindi",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "id": "Indonesian",
+}
+
+# Bahasa yang pakai MangaOCR (bukan PaddleOCR)
+MANGA_OCR_LANGS = {"ja"}
+
+
 @dataclass
 class Config:
   # ── Path ──────────────────────────────────
@@ -20,6 +49,7 @@ class Config:
 
   # ── Pipeline ──────────────────────────────
   source_lang: str = "ja"          # ja | ch | korean
+  force_paddle: bool = False         # paksa PaddleOCR meski source_lang =
   font_size: int = 24
   render_dpi: int = 150           # 150 cukup untuk komik
   yolo_conf: float = 0.35
@@ -32,15 +62,13 @@ class Config:
       "/usr/share/fonts/TTF/NotoSansCJK-Regular.ttc",
   ])
 
-  # ── Nama bahasa (untuk prompt Ollama) ─────
-  LANG_NAMES: dict = field(default_factory=lambda: {
-      "ja": "Japanese",
-      "ch": "Chinese",
-      "korean": "Korean",
-  })
-
   def lang_name(self) -> str:
-    return self.LANG_NAMES.get(self.source_lang, self.source_lang)
+    """Nama panjang bahasa sumber untuk prompt Ollama."""
+    return SUPPORTED_LANGS.get(self.source_lang, self.source_lang)
+
+  def use_manga_ocr(self) -> bool:
+    """True jika harus pakai MangaOCR, False jika PaddleOCR."""
+    return self.source_lang in MANGA_OCR_LANGS and not self.force_paddle
 
   def work_dir(self, input_path: str) -> Path:
     """Folder kerja JSON antar tahap. Contoh: komik.pdf → komik_translate_work/"""

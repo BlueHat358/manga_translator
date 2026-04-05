@@ -20,4 +20,4 @@ onnxruntime      # ONNX runtime — inferensi CPU lebih cepat dari PyTorch
 # Translation (Ollama API)
 #openai           # OpenAI-compatible client untuk Ollama
 ollama
-
+options, dll

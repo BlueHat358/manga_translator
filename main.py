@@ -7,11 +7,25 @@ Subcommand:
     split       Pecah PDF besar menjadi part-part kecil
     merge       Gabungkan semua part yang sudah selesai
     status      Cek progress tiap part
+    langs       Tampilkan daftar bahasa yang didukung
 
 Cara pakai:
+    # Default: manga Jepang → English
+    python main.py translate -i komik.pdf -o hasil.pdf
+
+    # Manhua China → Indonesia
+    python main.py translate -i manhua.pdf -o hasil.pdf --lang ch --target Indonesia
+
+    # Manga Jepang → Indonesia, pakai PaddleOCR
+    python main.py translate -i komik.pdf -o hasil.pdf --target Indonesia --force-paddle
+
+    # Lihat semua bahasa yang didukung
+    python main.py langs
+
+
     # Komik kecil — langsung terjemahkan
     python main.py translate -i komik.pdf -o hasil.pdf
-    
+
     # Dengan jeda 3 menit sebelum shutdown
     python main.py translate -i komik.pdf -o hasil.pdf --shutdown --shutdown-delay 3
 
@@ -32,7 +46,7 @@ import sys
 import pydoc
 
 from src import pipeline
-from src.config import Config
+from src.config import Config, SUPPORTED_LANGS, MANGA_OCR_LANGS
 from src.splitter import PDFSplitter
 from src.merger import PDFMerger
 from src.shutdown import schedule_shutdown
@@ -86,6 +100,8 @@ def make_config(args) -> Config:
       font_path=args.font,
       ollama_model=args.model,
       source_lang=args.lang,
+      target_lang=args.target,
+      force_paddle=getattr(args, "force_paddle", False),
       font_size=args.font_size,
       render_dpi=args.dpi,
       yolo_conf=args.conf,
@@ -93,15 +109,43 @@ def make_config(args) -> Config:
 
 
 def print_header(cfg: Config, input_path: str, output_path: str = ""):
+  ocr_engine = "MangaOCR" if cfg.use_manga_ocr(
+  ) else f"PaddleOCR ({cfg.source_lang})"
   print(f"\n{'═' * 55}")
   print(f"  Manga Translator")
   print(f"{'═' * 55}")
   print(f"  Input    : {input_path}")
   if output_path:
     print(f"  Output   : {output_path}")
-  print(f"  Bahasa   : {cfg.source_lang} → {cfg.target_lang}")
+  print(f"  Sumber   : {cfg.lang_name()} [{cfg.source_lang}]")
+  print(f"  Target   : {cfg.target_lang}")
+  print(f"  OCR      : {ocr_engine}")
   print(f"  Ollama   : {cfg.ollama_model}")
   print(f"{'═' * 55}")
+
+
+# ─────────────────────────────────────────────
+# Subcommand: langs
+# ─────────────────────────────────────────────
+
+def cmd_langs(args):
+  """Tampilkan daftar bahasa sumber yang didukung."""
+  print(f"\n{'═' * 55}")
+  print(f"  Bahasa Sumber yang Didukung (--lang)")
+  print(f"{'═' * 55}")
+  print(f"  {'Kode':<18} {'Bahasa':<25} {'OCR Engine'}")
+  print(f"  {'-' * 50}")
+  for code, name in SUPPORTED_LANGS.items():
+    engine = "MangaOCR" if code in MANGA_OCR_LANGS else "PaddleOCR"
+    marker = " ✓" if code in MANGA_OCR_LANGS else ""
+    print(f"  {code:<18} {name:<25} {engine}{marker}")
+  print(f"\n  ✓ MangaOCR lebih akurat untuk font manga Jepang yang stylized.")
+  print(f"  Gunakan --force-paddle untuk paksa PaddleOCR pada bahasa Jepang.")
+  print(f"\n  Bahasa tujuan (--target) bisa diisi bebas, contoh:")
+  print(f"    --target Indonesia")
+  print(f"    --target Japanese")
+  print(f"    --target Malay")
+  print(f"    --target Spanish")
 
 
 # ─────────────────────────────────────────────
@@ -111,7 +155,8 @@ def print_header(cfg: Config, input_path: str, output_path: str = ""):
 def cmd_translate(args):
   """Terjemahkan satu file PDF (atau satu part)."""
   cfg = make_config(args)
-  print_header(cfg, args.input, args.output)
+  output = getattr(args, "output", None) or "/dev/null"
+  print_header(cfg, args.input, output)
 
   stage = args.stage  # 0 = semua tahap
 
@@ -144,13 +189,14 @@ def cmd_split(args):
   for p in parts:
     print(f"  {p}")
 
+  lang_args = f"--lang {args.lang} --target \"{args.target}\""
   print(f"\nLangkah selanjutnya:")
-  print(f"  python main.py status -i {args.input}")
+  print(f"  python main.py status -i \"{args.input}\"")
   for p in parts:
     print(
-      f"  python main.py translate -i \"{p}\" -o /dev/null --lang {args.lang}")
+      f"  python main.py translate -i \"{p}\" -o /dev/null {lang_args} --shutdown")
   print(
-    f"  python main.py merge -i \"{args.input}\" -o hasil_final.pdf --lang {args.lang}")
+    f"  python main.py merge -i \"{args.input}\" -o hasil_final.pdf {lang_args}")
 
 
 # ─────────────────────────────────────────────
@@ -170,6 +216,8 @@ def cmd_status(args):
   print(f"  Selesai    : {len(status['done'])}")
   print(f"  Pending    : {len(status['pending'])}")
 
+  lang_args = f"--lang {args.lang} --target \"{args.target}\""
+
   if status["done"]:
     print(f"\n  ✓ Selesai:")
     for p in status["done"]:
@@ -182,12 +230,12 @@ def cmd_status(args):
     print(f"\n  Perintah untuk melanjutkan:")
     for p in status["pending"]:
       print(
-        f"    python main.py translate -i \"{p}\" -o /dev/null --lang {args.lang}")
+        f"    python main.py translate -i \"{p}\" {lang_args} --shutdown")
 
   if not status["pending"] and status["total_parts"] > 0:
     print(f"\n  Semua part selesai! Jalankan merge:")
     print(
-      f"    python main.py merge -i \"{args.input}\" -o hasil_final.pdf --lang {args.lang}")
+      f"    python main.py merge -i \"{args.input}\" -o hasil_final.pdf {lang_args}")
 
 
 # ─────────────────────────────────────────────
@@ -292,6 +340,12 @@ def build_parser() -> argparse.ArgumentParser:
                       help="Tampilkan halaman bantuan lengkap (man page) dan keluar")
 
   sub = parser.add_subparsers(dest="command", required=True)
+
+  # ── langs ──────────────────────────────────────────
+  p_langs = sub.add_parser("langs",
+                           help="Tampilkan daftar bahasa sumber yang didukung",
+                           )
+  p_langs.set_defaults(func=cmd_langs)
 
   # ── translate ──────────────────────────────────────
   p_translate = sub.add_parser("translate",
