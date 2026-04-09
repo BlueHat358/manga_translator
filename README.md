@@ -100,10 +100,6 @@ python main.py translate -i "komik.pdf" -o "komik_en.pdf" --target English
 # Paksa menggunakan PaddleOCR pada manga Jepang
 python main.py translate -i "komik.pdf" -o "komik_id.pdf" --force-paddle
 
-# Jalankan satu tahap saja (untuk resume jika terputus)
-python main.py translate -i "komik.pdf" -o "hasil.pdf" --stage 1  # deteksi + OCR
-python main.py translate -i "komik.pdf" -o "hasil.pdf" --stage 2  # terjemahan
-python main.py translate -i "komik.pdf" -o "hasil.pdf" --stage 3  # render PDF
 ```
 
 ### 2. Workflow Part per Part (Komik Besar)
@@ -112,17 +108,17 @@ Jika komik sangat panjang, memori akan cepat penuh. Maka manfaatkan pecah per-pa
 
 ```bash
 # a. Pecah komik besar menjadi part-part kecil (misal: per 50 halaman)
-python main.py split -i "komik.pdf" --pages 50
+python main.py split -i "komik.pdf" --pages 50 -l ch -t Indonesia
 
-# b. Terjemahkan dari salah satu file part
-# (simpan sementara ke null/bebas asal nama output tersedia, krn merge membaca part yg sudah ditranslate)
-python main.py translate -i "komik_parts/komik_part001.pdf" -o /dev/null
+# b. Terjemahkan dari salah satu file part (Ingat! Bawa argumen lang dan target yang sama)
+# (tanpa merender PDF, karena tahap render akan dieksekusi secara otomatis saat merge)
+python main.py translate -i "komik_parts/komik_part001.pdf" -l ch -t Indonesia --no-render --shutdown
 
 # c. Cek progres semua part pengerjaan komik
-python main.py status -i "komik.pdf"
+python main.py status -i "komik.pdf" -l ch -t Indonesia
 
 # d. Gabungkan semua PDF part yang sudah sukses
-python main.py merge -i "komik.pdf" -o "komik_id.pdf"
+python main.py merge -i "komik.pdf" -o "komik_id.pdf" -l ch -t Indonesia
 ```
 
 ---
@@ -157,8 +153,8 @@ Sistem ini memiliki 4 subcommand utama. Anda dapat memanggil bantuan detail fitu
 **`translate`**
 
 - `--input / -i` : Path PDF original yang diproses (wajib)
-- `--output / -o` : Path output yang di-generate (wajib)
-- `--stage / -s` : Jalankan salah satu stage (`1`, `2`, `3`). Tanpa parameter berarti semua tahap tereksekusi.
+- `--output / -o` : Path output yang di-generate (wajib, kecuali `--no-render` aktif)
+- `--no-render` : Lewati tahap render PDF (Tahap 3). Biasanya digunakan saat memproses part dari komik besar; semua render akan ditunda dan digabungkan otomatis saat mengeksekusi `merge`.
 - `--shutdown` : Mematikan PC seketika proses selesai
 - `--shutdown-delay` : Mengatur delay (dalam hitungan menit) sebelum PC shutdown (default: 1)
 

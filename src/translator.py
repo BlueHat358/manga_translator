@@ -60,9 +60,7 @@ class OllamaTranslator:
         },
         {
             "role": "user",
-            # /no_think sebagai fallback tambahan untuk model yang
-            # belum mendukung parameter think=False via API
-            "content": f"{text} /no_think",
+            "content": f"{text}",
         },
     ]
 

@@ -29,16 +29,12 @@ Cara pakai:
     # Dengan jeda 3 menit sebelum shutdown
     python main.py translate -i komik.pdf -o hasil.pdf --shutdown --shutdown-delay 3
 
-    # Komik besar — pecah dulu, terjemahkan part per part, lalu gabung
-    python main.py split   -i komik.pdf --pages 50
-    python main.py status  -i komik.pdf
-    python main.py translate -i komik_parts/komik_part001.pdf -o /dev/null
-    python main.py translate -i komik_parts/komik_part001.pdf -o /dev/null --shutdown
-    python main.py translate -i komik_parts/komik_part002.pdf -o /dev/null
-    python main.py merge   -i komik.pdf -o komik_id.pdf
-
-    # Resume tahap tertentu pada satu part
-    python main.py translate -i komik_parts/komik_part001.pdf -o /dev/null --stage 2
+    # Komik besar (Contoh Manhua China) — terjemahkan part per part dengan bahasa & target konsisten
+    python main.py split   -i komik.pdf --pages 50 -l ch -t Indonesia
+    python main.py status  -i komik.pdf -l ch -t Indonesia
+    python main.py translate -i komik_parts/komik_part001.pdf -l ch -t Indonesia --no-render
+    python main.py translate -i komik_parts/komik_part002.pdf -l ch -t Indonesia --no-render --shutdown
+    python main.py merge   -i komik.pdf -o komik_id.pdf -l ch -t Indonesia
 """
 
 import argparse
@@ -159,24 +155,37 @@ def cmd_langs(args):
 def cmd_translate(args):
   """Terjemahkan satu file PDF (atau satu part)."""
   cfg = make_config(args)
-  output = getattr(args, "output", None) or "/dev/null"
-  print_header(cfg, args.input, output)
+  no_render = args.no_render
+  # Validasi: tanpa --no-render, -o wajib ada
+  if not no_render and not args.output:
+    print("[ERROR] -o / --output diperlukan.")
+    print("        Untuk komik besar (per part), gunakan --no-render:")
+    print(
+      f"          python main.py translate -i \"{args.input}\" --no-render --shutdown")
+    sys.exit(1)
 
-  stage = args.stage  # 0 = semua tahap
+  print_header(cfg, args.input, args.output or "")
+  if no_render:
+    print(f"  Mode     : Per part (stage 3 di-skip, render dilakukan saat merge)")
+    print(f"{'═' * 55}")
 
-  if stage in (0, 1):
-    pipeline.detect_and_ocr(cfg, args.input)
+  # Stage 1 — OCR
+  pipeline.detect_and_ocr(cfg, args.input)
 
-  if stage in (0, 2):
-    pipeline.translate(cfg, args.input)
+  # Stage 2 — Translate
+  pipeline.translate(cfg, args.input)
 
-  if stage in (0, 3):
+  # Stage 3 — Render (di-skip jika --no-render)
+  if not no_render:
     pipeline.render(cfg, args.input, args.output)
 
-  if stage == 0:
-    print(f"\n{'═' * 55}")
+  print(f"\n{'═' * 55}")
+  if no_render:
+    print(f"  ✓ OCR + Translate selesai. Stage 3 di-skip.")
+    print(f"  Part ini siap di-merge setelah semua part beres.")
+  else:
     print(f"  ✓ Selesai! Output: {args.output}")
-    print(f"{'═' * 55}")
+  print(f"{'═' * 55}")
 
 
 # ─────────────────────────────────────────────
@@ -198,7 +207,7 @@ def cmd_split(args):
   print(f"  python main.py status -i \"{args.input}\"")
   for p in parts:
     print(
-      f"  python main.py translate -i \"{p}\" -o /dev/null {lang_args} --shutdown")
+      f"  python main.py translate -i \"{p}\" {lang_args} --no-render --shutdown")
   print(
     f"  python main.py merge -i \"{args.input}\" -o hasil_final.pdf {lang_args}")
 
@@ -309,17 +318,19 @@ OPSI SHUTDOWN (Tidak tersedia di subcommand status)
        --shutdown            Shutdown PC otomatis setelah proses selesai.
        --shutdown-delay <n>  Jeda waktu (dalam menit) sebelum PC dimatikan (default: 1).
 
-WORKFLOW KOMIK BESAR (Misal: 200 halaman)
+WORKFLOW KOMIK BESAR (Misal: Manhua China 200 halaman)
+       Penting: Pastikan flag bahasa (-l) dan target (-t) selalu sama/konsisten di semua subcommand!
+
        Hari 1 - Pecah dan mulai part pertama
-         $ python main.py split -i komik.pdf --pages 50
-         $ python main.py translate -i komik_parts/komik_part001.pdf -o /dev/null
+         $ python main.py split -i komik.pdf --pages 50 -l ch -t Indonesia
+         $ python main.py translate -i komik_parts/komik_part001.pdf -l ch -t Indonesia --no-render --shutdown
 
        Hari 2 - Cek status bagian yang tertinggal dan lanjutkan part berikutnya
-         $ python main.py status -i komik.pdf
-         $ python main.py translate -i komik_parts/komik_part002.pdf -o /dev/null
+         $ python main.py status -i komik.pdf -l ch -t Indonesia
+         $ python main.py translate -i komik_parts/komik_part002.pdf -l ch -t Indonesia --no-render --shutdown
 
        Selesai - Setelah status semua part '✓ Selesai', gabungkan kembali
-         $ python main.py merge -i komik.pdf -o komik_ind.pdf
+         $ python main.py merge -i komik.pdf -o komik_id.pdf -l ch -t Indonesia
 """
 
 
@@ -355,14 +366,28 @@ def build_parser() -> argparse.ArgumentParser:
 
   # ── translate ──────────────────────────────────────
   p_translate = sub.add_parser("translate",
-                               help="Terjemahkan satu file PDF (atau satu part)",
+                               help="Terjemahkan PDF",
+                               formatter_class=argparse.RawDescriptionHelpFormatter,
+                               epilog="""
+Komik pendek (langsung selesai, butuh -o):
+  python main.py translate -i komik.pdf -o hasil.pdf -l korean -t Indonesia
+
+Komik besar per part (--no-render, tanpa -o):
+  python main.py translate -i komik_parts/komik_part001.pdf -l korean -t Indonesia --no-render --shutdown
+
+  --no-render melewati stage 3 (render PDF).
+  Stage 3 dijalankan sekaligus saat merge.
+        """
                                )
+  p_translate.add_argument("--input", "-i", required=True,
+                           help="Path PDF input")
+  p_translate.add_argument("--output", "-o", default=None,
+                           help="Path PDF output. Wajib kecuali pakai --no-render")
   p_translate.add_argument(
-      "--input", "-i", required=True, help="Path PDF input")
-  p_translate.add_argument(
-      "--output", "-o", required=True, help="Path PDF output")
-  p_translate.add_argument("--stage", "-s", type=int, choices=[1, 2, 3], default=0,
-                           help="Jalankan hanya tahap 1/2/3. Default: semua")
+      "--no-render", action="store_true",
+      help="Skip stage 3 (render PDF). Gunakan untuk komik besar per part. "
+           "Stage 3 akan dijalankan sekaligus saat merge."
+  )
   add_common_args(p_translate)
   add_shutdown_args(p_translate)
   p_translate.set_defaults(func=cmd_translate)
